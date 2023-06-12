@@ -1,0 +1,14 @@
+
+<!-- rosrun image_view2 image_view2 image:=/center_camera/image_color _image_transport:=compressed -->
+
+<launch>
+  <arg name="image_src" default="/image_raw" />
+  <arg name="camera_info_src" default="/camera_info" />
+
+  <node pkg="image_view2" type="image_view2" name="image_viewer" >
+    <param name="image" value="$(arg image_src)"/>
+    <remap from="image" to="/center_camera/image_color" />
+    <param name="image_transport" value="compressed"/>
+  </node>
+  
+</launch>
