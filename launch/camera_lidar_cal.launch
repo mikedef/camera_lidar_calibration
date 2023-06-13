@@ -5,10 +5,23 @@
 <launch>
   <arg name="image_src" default="/image_raw" />
   <arg name="camera_info_src" default="/camera_info" />
+  <arg name="image_transport_" default="compressed"/>
+  <arg name="bag_file" default="/home/mikedef/auvlab/asv/cal_tests/cal.bag" />
 
   <node pkg="image_view2" type="image_view2" name="image_viewer" >
     <remap from="image" to="/center_camera/image_color" />
     <param name="image_transport" value="compressed"/>
   </node>
+
+  <node pkg="camera_lidar_calibration" type="camera_lidar_cal" name="camera_lidar_cal" output="screen">
+    <param name="image_src" value="/center_camera/image_color" />
+    <param name="image_transport" value="$(arg image_transport_)"/>
+    <param name="image_info_src" value="/center_camera/camera_info"/>    
+  </node>
+
+  <node pkg="rviz" type="rviz" name="calibration_rviz" />
+
+  <node pkg="rosbag" type="play" name="calibration_rosbag" output="screen"
+	args="--clock -l $(arg bag_file)"/>
   
 </launch>

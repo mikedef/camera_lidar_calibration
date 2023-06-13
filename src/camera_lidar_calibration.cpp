@@ -22,6 +22,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/PointStamped.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
@@ -41,6 +42,43 @@ class CameraLidarCal
   ros::Subscriber image_raw_sub_;
   ros::Subscriber image_point_sub_;
   ros::Subscriber clicked_point_sub_;
+
+  std::vector<cv::Point2f> clicked_image_points_;
+  std::vector<cv::Point3f> clicked_pointcloud_points_;
+  
+  void ImageClickedPointCb(const geometry_msgs::PointStamped& in_clicked_point)
+    {
+      clicked_image_points_.push_back(cv::Point2f(in_clicked_point.point.x,
+						  in_clicked_point.point.y));
+      std::cout << cv::Point2f(in_clicked_point.point.x,
+			       in_clicked_point.point.y) << std::endl << std::endl;
+
+      Calibrate();
+    }
+
+  void RvizClickedPointCb(const geometry_msgs::PointStamped& in_clicked_point)
+    {
+      clicked_pointcloud_points_.push_back(cv::Point3f(in_clicked_point.point.x,
+						       in_clicked_point.point.y,
+						       in_clicked_point.point.z));
+      std::cout << cv::Point3f(in_clicked_point.point.x,
+			       in_clicked_point.point.y,
+			       in_clicked_point.point.z) << std::endl << std::endl;
+      Calibrate();
+    }
+
+  void Calibrate()
+    {
+      if(clicked_image_points_.size() > 3 && clicked_pointcloud_points_.size() > 3)
+      {
+	ROS_INFO("[%s] Time to calibrate", __APP_NAME__);
+      }
+    }
+
+  void ImageCb(const sensor_msgs::Image& in_image)
+    {
+      ROS_INFO("[%s] Image Msg", __APP_NAME__);
+    }
 
 public:
   void Run()
