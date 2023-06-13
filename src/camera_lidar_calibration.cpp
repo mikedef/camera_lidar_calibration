@@ -45,6 +45,11 @@ class CameraLidarCal
 
   std::vector<cv::Point2f> clicked_image_points_;
   std::vector<cv::Point3f> clicked_pointcloud_points_;
+  cv::Size image_size_;
+  //image_geometry::PinholeCameraModel cam_model_;
+  cv::Vec3d rotational_vector_, translational_vector_;
+  cv::Mat cameraMatrix_;
+  cv::Mat distCoeffs_;
   
   void ImageClickedPointCb(const geometry_msgs::PointStamped& in_clicked_point)
     {
@@ -72,12 +77,34 @@ class CameraLidarCal
       if(clicked_image_points_.size() > 3 && clicked_pointcloud_points_.size() > 3)
       {
 	ROS_INFO("[%s] Time to calibrate", __APP_NAME__);
+	
       }
     }
 
   void ImageCb(const sensor_msgs::Image& in_image)
     {
       ROS_INFO("[%s] Image Msg", __APP_NAME__);
+    }
+
+  void IntrinsicsCb(const sensor_msgs::CameraInfoConstPtr& in_info)
+    {
+      image_size_.height = in_info->height;
+      image_size_.width = in_info->width;
+
+      //cam_model_.fromCameraInfo(info_msg);
+
+      // Work around for const double to double copy issue
+      cv::Mat k(3,3,CV_64FC1, (void *) in_info->K.data());
+      cameraMatrix_= k.clone();
+      cv::Mat d(1,5,CV_64FC1, (void *) in_info->D.data());
+      distCoeffs_ = d.clone();
+   
+      std::cout << "Camera Matrix: " << cameraMatrix_ << std::endl << std::endl;
+      std::cout << "Distortion Coefficients: " << distCoeffs_ << std::endl << std::endl;
+
+      image_intrinsics_sub_.shutdown();
+      ROS_INFO("[%s] Image Intrinsics set: %i, %i", __APP_NAME__,
+	       image_size_.height, image_size_.width);
     }
 
 public:
@@ -97,9 +124,9 @@ public:
       // Subs
       ROS_INFO("[%s] image_raw_sub_ subscribing to %s", __APP_NAME__, image_src.c_str());
       image_raw_sub_ = nh_.subscribe(image_src, 1, &CameraLidarCal::ImageCb, this);
-      /*
       ROS_INFO("[%s] image_intrinsics_sub_ subscribing to %s", __APP_NAME__, image_info_src.c_str());
       image_intrinsics_sub_ = nh_.subscribe(image_info_src, 1, &CameraLidarCal::IntrinsicsCb, this);
+      /*
       ROS_INFO("[%s] image_extrinsics_sub_ subscribing to %s", __APP_NAME__,
 	       camera_to_lidar_extrinisics.c_str());
       image_extrinsics_sub_ = nh_.subscribe(camera_to_lidar_extrinsics, 1,
