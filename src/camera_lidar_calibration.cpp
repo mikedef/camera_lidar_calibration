@@ -39,9 +39,11 @@ class CameraLidarCal
 
   ros::Subscriber image_intrinsics_sub_;
   ros::Subscriber image_extrinsics_sub_;
-  ros::Subscriber image_raw_sub_;
+  image_transport::ImageTransport it_;
+  image_transport::Subscriber image_raw_sub_;
   ros::Subscriber image_point_sub_;
   ros::Subscriber clicked_point_sub_;
+  image_transport::Publisher projected_pub_;
 
   std::vector<cv::Point2f> clicked_image_points_;
   std::vector<cv::Point3f> clicked_pointcloud_points_;
@@ -50,6 +52,8 @@ class CameraLidarCal
   cv::Vec3d rotational_vector_, translational_vector_;
   cv::Mat cameraMatrix_;
   cv::Mat distCoeffs_;
+  bool calibrated = false;
+  cv_bridge::CvImagePtr cv_ptr_;
   
   void ImageClickedPointCb(const geometry_msgs::PointStamped& in_clicked_point)
     {
@@ -74,16 +78,54 @@ class CameraLidarCal
 
   void Calibrate()
     {
-      if(clicked_image_points_.size() > 3 && clicked_pointcloud_points_.size() > 3)
+      if(clicked_image_points_.size() > 4 && clicked_pointcloud_points_.size() > 4)
       {
 	ROS_INFO("[%s] Time to calibrate", __APP_NAME__);
+	cv::solvePnPRansac(clicked_pointcloud_points_,
+			   clicked_image_points_,
+			   cameraMatrix_,
+			   distCoeffs_,
+			   rotational_vector_,
+			   translational_vector_);
+	std::cout << "rvec: " << rotational_vector_ <<
+	  "\n tvec: " << translational_vector_ << std::endl;
+
+	calibrated = true;
 	
       }
     }
 
-  void ImageCb(const sensor_msgs::Image& in_image)
+  void ImageCb(const sensor_msgs::ImageConstPtr& in_image)
     {
-      ROS_INFO("[%s] Image Msg", __APP_NAME__);
+      // ROS_INFO("[%s] Image Msg", __APP_NAME__);
+      //rvec: [0.962355, -0.734223, 1.03141]
+      //tvec: [11.1595, -13.9989, 9.39018]
+
+      if (calibrated)
+	{
+	  // convert image msg to cv image
+	  try
+	  {
+	    cv_ptr_ = cv_bridge::toCvCopy(in_image, sensor_msgs::image_encodings::BGR8);
+	  }
+	  catch (cv_bridge::Exception& e)
+	  {
+	    ROS_ERROR("cv_bridge exception: %s", e.what());
+	    return;
+	  }
+
+	  // Test reprojection of clicked 3d points before full pcl msg
+	  
+	  std::vector<cv::Point2f> image_points;
+	  cv::projectPoints(clicked_pointcloud_points_, rotational_vector_, translational_vector_,
+			    cameraMatrix_, distCoeffs_, image_points);
+	  for (const auto& p : image_points)
+	  {
+	    cv::circle(cv_ptr_->image, cv::Point(p.x, p.y),
+		       2, cv::Scalar(0,255,0), 5);
+	  projected_pub_.publish(cv_ptr_->toImageMsg());
+	  }
+	}
     }
 
   void IntrinsicsCb(const sensor_msgs::CameraInfoConstPtr& in_info)
@@ -108,6 +150,14 @@ class CameraLidarCal
     }
 
 public:
+  CameraLidarCal()
+    : it_(nh_)
+    {
+    }
+  ~CameraLidarCal()
+    {
+    }
+  
   void Run()
     {
       ros::NodeHandle private_nh("~");
@@ -123,7 +173,7 @@ public:
 
       // Subs
       ROS_INFO("[%s] image_raw_sub_ subscribing to %s", __APP_NAME__, image_src.c_str());
-      image_raw_sub_ = nh_.subscribe(image_src, 1, &CameraLidarCal::ImageCb, this);
+      image_raw_sub_ = it_.subscribe(image_src, 1, &CameraLidarCal::ImageCb, this);
       ROS_INFO("[%s] image_intrinsics_sub_ subscribing to %s", __APP_NAME__, image_info_src.c_str());
       image_intrinsics_sub_ = nh_.subscribe(image_info_src, 1, &CameraLidarCal::IntrinsicsCb, this);
       /*
@@ -142,6 +192,7 @@ public:
 					 &CameraLidarCal::RvizClickedPointCb, this);
       
       // Pubs
+      projected_pub_ = it_.advertise(image_src + "/projected", 100);
 
       ROS_INFO("[%s] Starting Camera/Lidar cal", __APP_NAME__);
       ros::spin();

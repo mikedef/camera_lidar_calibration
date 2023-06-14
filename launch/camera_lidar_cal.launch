@@ -19,9 +19,10 @@
     <param name="image_info_src" value="/center_camera/camera_info"/>    
   </node>
 
-  <node pkg="rviz" type="rviz" name="calibration_rviz" />
+  <node pkg="rviz" type="rviz" name="calibration_rviz"
+	args="-d /home/mikedef/auvlab/asv/cal_tests/cal_test.rviz"/>
 
   <node pkg="rosbag" type="play" name="calibration_rosbag" output="screen"
-	args="--clock -l $(arg bag_file)"/>
+	args="--clock -l -s 120 --pause $(arg bag_file)"/>
   
 </launch>
