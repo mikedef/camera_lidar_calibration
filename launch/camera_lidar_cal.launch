@@ -8,8 +8,9 @@
   <arg name="image_transport_" default="compressed"/>
   <arg name="bag_file" default="/home/mikedef/auvlab/asv/cal_tests/cal.bag" />
 
+
   <node pkg="image_view2" type="image_view2" name="image_viewer" >
-    <remap from="image" to="/center_camera/image_color" />
+    <remap from="image" to="/center_camera/image_color/rect" />
     <param name="image_transport" value="compressed"/>
   </node>
 
@@ -22,7 +23,45 @@
   <node pkg="rviz" type="rviz" name="calibration_rviz"
 	args="-d /home/mikedef/auvlab/asv/cal_tests/cal_test.rviz"/>
 
-  <node pkg="rosbag" type="play" name="calibration_rosbag" output="screen"
+  <node pkg="rosbag" type="play" name="calibration_rosbag" 
 	args="--clock -l -s 120 --pause $(arg bag_file)"/>
-  
+
+  <!-- launch radar clustering -->                                                                      
+  <arg name="radar" default="true" />                                                                   
+  <group ns="radar_clustering">                                                                         
+    <node pkg="pointcloud_cluster_detect"                                                               
+          type="pointcloud_euclidean_cluster_detect"                                                    
+          name="pointcloud_euclidean_cluster_detect"                                                    
+          output="screen"                                                                               
+          if='$(arg radar)'                                                                             
+          required="true" >                                                                             
+      <param name="pc_topic" value="/broadband_radar/channel_0/pointcloud/revolution"/>                 
+      <rosparam                                                                                         
+        file="$(find rex4_perception)/params/radar-clustering.yaml" />                                  
+    </node>                                                                                             
+                                                                                                        
+    <node pkg="pointcloud_cluster_detect"                                                               
+          type="pointcloud_sweep_aggregator"                                                            
+          name="pointcloud_sweep_aggregator"                                                            
+          output="screen" >                                                                             
+    </node>                                                                                             
+  </group>                                                                                              
+                                                                                                        
+                                                                                                        
+  <!-- launch lidar clustering -->                                                                      
+  <!--   -->                                                                                          
+  <arg name="lidar" default="true" />                                                                   
+  <group ns="lidar_clustering">                                                                         
+    <node pkg="pointcloud_cluster_detect"                                                               
+          type="pointcloud_euclidean_cluster_detect"                                                    
+          name="pointcloud_euclidean_cluster_detect"                                                    
+          output="screen"                                                                               
+          if="$(arg lidar)"                                                                             
+          required="true" >                                                                             
+      <param name="pc_topic" value="/velodyne_points"/>                                                 
+      <rosparam                                                                                         
+        file="$(find rex4_perception)/params/lidar-clustering.yaml" />                                  
+    </node>                                                                                             
+  </group>                                                                                              
+
 </launch>
